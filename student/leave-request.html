@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leave Request - Smart College ERP</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+    <div class="dashboard-layout">
+        <aside class="sidebar">
+            <div class="sidebar-header"><div class="sidebar-logo">SC</div><div class="sidebar-title">ERP System</div></div>
+            <ul class="sidebar-menu">
+                <li><a href="dashboard.html"><i class="bi bi-speedometer2"></i><span>Dashboard</span></a></li>
+                <li><a href="attendance.html"><i class="bi bi-calendar-check"></i><span>Attendance</span></a></li>
+                <li><a href="assignments.html"><i class="bi bi-file-earmark-text"></i><span>Assignments</span></a></li>
+                <li><a href="leave-request.html" class="active"><i class="bi bi-calendar-x"></i><span>Leave Request</span></a></li>
+                <li><a href="profile.html"><i class="bi bi-person-circle"></i><span>Profile</span></a></li>
+                <li style="margin-top: 40px; border-top: 1px solid var(--glass-border); padding-top: 20px;">
+                    <a href="#" onclick="APIService.logout()"><i class="bi bi-box-arrow-right"></i><span>Logout</span></a>
+                </li>
+            </ul>
+        </aside>
+        <div class="main-content">
+            <nav class="navbar">
+                <div class="navbar-search"><i class="bi bi-search"></i><input type="text" placeholder="Search leave requests..."></div>
+                <div class="navbar-right">
+                    <div class="navbar-icon notification"><i class="bi bi-bell"></i><span class="notification-badge">0</span></div>
+                    <div class="navbar-icon"><i class="bi bi-gear"></i></div>
+                    <div class="user-profile">
+                        <div class="user-avatar" id="userAvatar">--</div>
+                        <div class="user-info"><strong>Student</strong><small id="userName">Loading...</small></div>
+                        <i class="bi bi-chevron-down"></i>
+                    </div>
+                </div>
+            </nav>
+            <div class="content">
+                <div class="mb-4"><h1 class="h2 mb-2">Leave Request</h1><p class="text-muted">Apply for leave and track your requests</p></div>
+
+                <div class="row g-4 mb-4">
+                    <div class="col-lg-4"><div class="stat-card"><div class="stat-icon primary"><i class="bi bi-calendar-x"></i></div><div class="stat-label">Total Balance</div><div class="stat-value" id="totalDays">--</div></div></div>
+                    <div class="col-lg-4"><div class="stat-card"><div class="stat-icon success"><i class="bi bi-check-circle-fill"></i></div><div class="stat-label">Used</div><div class="stat-value" id="usedDays">--</div></div></div>
+                    <div class="col-lg-4"><div class="stat-card"><div class="stat-icon warning"><i class="bi bi-hourglass-split"></i></div><div class="stat-label">Remaining</div><div class="stat-value" id="remainingDays">--</div></div></div>
+                </div>
+
+                <div class="row g-4">
+                    <div class="col-lg-5">
+                        <div class="glass-card" style="padding:20px;">
+                            <h5 style="margin-bottom:20px;">Apply for Leave</h5>
+                            <form id="leaveRequestForm">
+                                <div class="mb-3"><label class="form-label">Start Date *</label><input type="date" class="form-control glass-input" id="leaveStartDate" required></div>
+                                <div class="mb-3"><label class="form-label">End Date *</label><input type="date" class="form-control glass-input" id="leaveEndDate" required></div>
+                                <div class="mb-3"><label class="form-label">Number of Days</label><input type="number" class="form-control glass-input" id="leaveDays" disabled></div>
+                                <div class="mb-3"><label class="form-label">Reason for Leave *</label><textarea class="form-control glass-input" id="leaveReason" rows="4" placeholder="Explain your reason..." required></textarea></div>
+                                <button type="submit" class="btn btn-primary w-100"><i class="bi bi-check-circle me-2"></i>Submit Request</button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-7">
+                        <div class="glass-card" style="padding:20px;">
+                            <h5 style="margin-bottom:20px;">My Leave Requests</h5>
+                            <div id="leaveList"><p class="text-muted small">Loading...</p></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../assets/js/supabase-config.js"></script>
+    <script src="../assets/js/api.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const user = await APIService.requireRole(['student']);
+            if (!user) return;
+            document.getElementById('userName').textContent = user.name;
+            document.getElementById('userAvatar').textContent = user.name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+
+            setupDateCalculation();
+            await loadBalance();
+            await loadLeaves();
+        });
+
+        function setupDateCalculation() {
+            const startInput = document.getElementById('leaveStartDate');
+            const endInput = document.getElementById('leaveEndDate');
+            const daysInput = document.getElementById('leaveDays');
+            function calc() {
+                if (startInput.value && endInput.value) {
+                    const days = Math.round((new Date(endInput.value) - new Date(startInput.value)) / 86400000) + 1;
+                    daysInput.value = days > 0 ? days : '';
+                }
+            }
+            startInput.addEventListener('change', calc);
+            endInput.addEventListener('change', calc);
+        }
+
+        async function loadBalance() {
+            try {
+                const bal = await APIService.getMyLeaveBalance();
+                document.getElementById('totalDays').textContent = bal.total_days;
+                document.getElementById('usedDays').textContent = bal.used_days;
+                document.getElementById('remainingDays').textContent = bal.total_days - bal.used_days;
+            } catch (e) { console.error(e); }
+        }
+
+        async function loadLeaves() {
+            try {
+                const leaves = await APIService.getMyLeaveRequests();
+                const el = document.getElementById('leaveList');
+                if (!leaves.length) { el.innerHTML = '<p class="text-muted small">No leave requests yet.</p>'; return; }
+                const colors = { approved: '16,185,129', pending: '245,158,11', rejected: '239,68,68' };
+                const badges = { approved: 'badge-success', pending: 'badge-warning', rejected: 'badge-danger' };
+                el.innerHTML = leaves.map(l => `
+                    <div style="background: rgba(${colors[l.status]},0.1); border-left: 3px solid rgb(${colors[l.status]}); padding: 12px; border-radius: 8px; margin-bottom: 8px;">
+                        <div style="display:flex; justify-content:space-between; align-items:start;">
+                            <div>
+                                <div style="font-weight:600; font-size:14px;">${new Date(l.start_date).toLocaleDateString()} - ${new Date(l.end_date).toLocaleDateString()} (${l.days} Days)</div>
+                                <div style="font-size:12px; color:var(--text-secondary); margin-top:4px;">${l.reason}</div>
+                                ${l.status === 'rejected' && l.rejection_reason ? `<div style="font-size:12px; color:#F87171; margin-top:4px;">Reason: ${l.rejection_reason}</div>` : ''}
+                            </div>
+                            <span class="badge ${badges[l.status]}">${l.status}</span>
+                        </div>
+                    </div>`).join('');
+            } catch (e) { console.error(e); }
+        }
+
+        document.getElementById('leaveRequestForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const start = document.getElementById('leaveStartDate').value;
+            const end = document.getElementById('leaveEndDate').value;
+            const days = Number(document.getElementById('leaveDays').value);
+            const reason = document.getElementById('leaveReason').value;
+            try {
+                await APIService.applyLeave(start, end, days, reason);
+                e.target.reset();
+                await loadLeaves();
+            } catch (err) { alert(err.message); }
+        });
+    </script>
+</body>
+</html>

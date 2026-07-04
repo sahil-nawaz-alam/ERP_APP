@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Dashboard - Smart College ERP</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+    <div class="dashboard-layout">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo">SC</div>
+                <div class="sidebar-title">ERP System</div>
+            </div>
+            <ul class="sidebar-menu">
+                <li><a href="dashboard.html" class="active"><i class="bi bi-speedometer2"></i><span>Dashboard</span></a></li>
+                <li><a href="attendance.html"><i class="bi bi-calendar-check"></i><span>Attendance</span></a></li>
+                <li><a href="assignments.html"><i class="bi bi-file-earmark-text"></i><span>Assignments</span></a></li>
+                <li><a href="leave-request.html"><i class="bi bi-calendar-x"></i><span>Leave Request</span></a></li>
+                <li><a href="profile.html"><i class="bi bi-person-circle"></i><span>Profile</span></a></li>
+                <li style="margin-top: 40px; border-top: 1px solid var(--glass-border); padding-top: 20px;">
+                    <a href="#" onclick="APIService.logout()"><i class="bi bi-box-arrow-right"></i><span>Logout</span></a>
+                </li>
+            </ul>
+        </aside>
+
+        <div class="main-content">
+            <nav class="navbar">
+                <div class="navbar-search"><i class="bi bi-search"></i><input type="text" placeholder="Search assignments, marks..."></div>
+                <div class="navbar-right">
+                    <div class="navbar-icon notification"><i class="bi bi-bell"></i><span class="notification-badge" id="notifCount">0</span></div>
+                    <div class="navbar-icon"><i class="bi bi-gear"></i></div>
+                    <div class="user-profile">
+                        <div class="user-avatar" id="userAvatar">--</div>
+                        <div class="user-info"><strong>Student</strong><small id="userName">Loading...</small></div>
+                        <i class="bi bi-chevron-down"></i>
+                    </div>
+                </div>
+            </nav>
+
+            <div class="content">
+                <div class="mb-4">
+                    <h1 class="h2 mb-2" id="welcomeMsg">Welcome back! 👋</h1>
+                    <p class="text-muted" id="programInfo">Loading your details...</p>
+                </div>
+
+                <div class="row g-4 mb-4">
+                    <div class="col-md-6 col-lg-3">
+                        <div class="stat-card">
+                            <div class="stat-icon primary"><i class="bi bi-calendar-check-fill"></i></div>
+                            <div class="stat-label">Overall Attendance</div>
+                            <div class="stat-value" id="statAttendance">--</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 col-lg-3">
+                        <div class="stat-card">
+                            <div class="stat-icon success"><i class="bi bi-pencil-square"></i></div>
+                            <div class="stat-label">Assignments</div>
+                            <div class="stat-value" id="statAssignments">--</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 col-lg-3">
+                        <div class="stat-card">
+                            <div class="stat-icon warning"><i class="bi bi-star-fill"></i></div>
+                            <div class="stat-label">CGPA</div>
+                            <div class="stat-value" id="statCgpa">--</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 col-lg-3">
+                        <div class="stat-card">
+                            <div class="stat-icon danger"><i class="bi bi-calendar-x"></i></div>
+                            <div class="stat-label">Leaves Taken</div>
+                            <div class="stat-value" id="statLeaves">--</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-4 mb-4">
+                    <div class="col-lg-6">
+                        <div class="chart-card">
+                            <div class="chart-header"><h5 class="chart-title">Subject-wise Attendance</h5></div>
+                            <canvas id="subjectAttendanceChart" height="140"></canvas>
+                        </div>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="table-card">
+                            <div class="chart-header mb-3"><h5 class="chart-title">Recent Assignments</h5></div>
+                            <div id="recentAssignments"><p class="text-muted small">Loading...</p></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../assets/js/supabase-config.js"></script>
+    <script src="../assets/js/api.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const user = await APIService.requireRole(['student']);
+            if (!user) return;
+
+            document.getElementById('userName').textContent = user.name;
+            document.getElementById('userAvatar').textContent = user.name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+            document.getElementById('welcomeMsg').textContent = `Welcome back, ${user.name.split(' ')[0]}! 👋`;
+
+            try {
+                const dash = await APIService.getStudentDashboard();
+                document.getElementById('programInfo').textContent =
+                    `Semester ${dash.student.current_semester} | Roll No: ${dash.student.roll_no}`;
+                document.getElementById('statAttendance').textContent = dash.overallAttendance + '%';
+                document.getElementById('statAssignments').textContent = dash.totalAssignments;
+                document.getElementById('statCgpa').textContent = dash.student.cgpa;
+                document.getElementById('statLeaves').textContent = dash.leavesTaken;
+            } catch (e) { console.error(e); }
+
+            try {
+                const attendance = await APIService.getMyAttendance();
+                const bySubject = {};
+                attendance.forEach(r => {
+                    const name = r.subjects?.name || 'Unknown';
+                    bySubject[name] = bySubject[name] || { present: 0, total: 0 };
+                    bySubject[name].total++;
+                    if (r.status === 'present') bySubject[name].present++;
+                });
+                const labels = Object.keys(bySubject);
+                const data = labels.map(l => Math.round((bySubject[l].present / bySubject[l].total) * 100));
+
+                new Chart(document.getElementById('subjectAttendanceChart').getContext('2d'), {
+                    type: 'bar',
+                    data: { labels, datasets: [{ label: 'Attendance %', data, backgroundColor: '#2563EB', borderRadius: 8, borderSkipped: false }] },
+                    options: {
+                        responsive: true, maintainAspectRatio: true,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            y: { beginAtZero: true, max: 100, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94A3B8' } },
+                            x: { grid: { display: false }, ticks: { color: '#94A3B8' } }
+                        }
+                    }
+                });
+            } catch (e) { console.error(e); }
+
+            try {
+                const assignments = await APIService.getMyAssignments();
+                const el = document.getElementById('recentAssignments');
+                if (!assignments.length) { el.innerHTML = '<p class="text-muted small">No assignments yet.</p>'; return; }
+                el.innerHTML = assignments.slice(0, 5).map(a => `
+                    <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid var(--glass-border);">
+                        <div>
+                            <div style="font-size:13px; font-weight:600;">${a.title}</div>
+                            <div style="font-size:11px; color:var(--text-muted);">${a.subjects?.name || ''} · Due ${new Date(a.deadline).toLocaleDateString()}</div>
+                        </div>
+                        <span class="badge ${a.mySubmission ? 'badge-success' : 'badge-warning'}">${a.mySubmission ? 'Submitted' : 'Pending'}</span>
+                    </div>
+                `).join('');
+            } catch (e) { console.error(e); }
+        });
+    </script>
+</body>
+</html>

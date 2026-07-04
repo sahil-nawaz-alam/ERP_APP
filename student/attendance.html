@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Attendance - Smart College ERP</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+    <div class="dashboard-layout">
+        <aside class="sidebar">
+            <div class="sidebar-header"><div class="sidebar-logo">SC</div><div class="sidebar-title">ERP System</div></div>
+            <ul class="sidebar-menu">
+                <li><a href="dashboard.html"><i class="bi bi-speedometer2"></i><span>Dashboard</span></a></li>
+                <li><a href="attendance.html" class="active"><i class="bi bi-calendar-check"></i><span>Attendance</span></a></li>
+                <li><a href="assignments.html"><i class="bi bi-file-earmark-text"></i><span>Assignments</span></a></li>
+                <li><a href="leave-request.html"><i class="bi bi-calendar-x"></i><span>Leave Request</span></a></li>
+                <li><a href="profile.html"><i class="bi bi-person-circle"></i><span>Profile</span></a></li>
+                <li style="margin-top: 40px; border-top: 1px solid var(--glass-border); padding-top: 20px;">
+                    <a href="#" onclick="APIService.logout()"><i class="bi bi-box-arrow-right"></i><span>Logout</span></a>
+                </li>
+            </ul>
+        </aside>
+        <div class="main-content">
+            <nav class="navbar">
+                <div class="navbar-search"><i class="bi bi-search"></i><input type="text" placeholder="Search attendance records..."></div>
+                <div class="navbar-right">
+                    <div class="navbar-icon notification"><i class="bi bi-bell"></i><span class="notification-badge">0</span></div>
+                    <div class="navbar-icon"><i class="bi bi-gear"></i></div>
+                    <div class="user-profile">
+                        <div class="user-avatar" id="userAvatar">--</div>
+                        <div class="user-info"><strong>Student</strong><small id="userName">Loading...</small></div>
+                        <i class="bi bi-chevron-down"></i>
+                    </div>
+                </div>
+            </nav>
+            <div class="content">
+                <div class="mb-4"><h1 class="h2 mb-2">My Attendance</h1><p class="text-muted">Track your class attendance and performance</p></div>
+
+                <div class="row g-4 mb-4">
+                    <div class="col-lg-4">
+                        <div class="stat-card">
+                            <div class="stat-icon primary"><i class="bi bi-calendar-check-fill"></i></div>
+                            <div class="stat-label">Overall Attendance</div>
+                            <div class="stat-value" id="overallPct">--</div>
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="stat-card">
+                            <div class="stat-icon success"><i class="bi bi-check-circle-fill"></i></div>
+                            <div class="stat-label">Classes Attended</div>
+                            <div class="stat-value" id="presentCount">--</div>
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="stat-card">
+                            <div class="stat-icon danger"><i class="bi bi-x-circle-fill"></i></div>
+                            <div class="stat-label">Classes Missed</div>
+                            <div class="stat-value" id="absentCount">--</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-4 mb-4">
+                    <div class="col-lg-6">
+                        <div class="chart-card">
+                            <div class="chart-header"><h5 class="chart-title">Subject-wise Attendance</h5></div>
+                            <canvas id="subjectChart" height="140"></canvas>
+                        </div>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="table-card" style="max-height:360px; overflow-y:auto;">
+                            <div class="chart-header mb-3"><h5 class="chart-title">Recent Records</h5></div>
+                            <table class="table table-hover">
+                                <thead><tr><th>Date</th><th>Subject</th><th>Status</th></tr></thead>
+                                <tbody id="recordsBody"><tr><td colspan="3" class="text-muted small">Loading...</td></tr></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../assets/js/supabase-config.js"></script>
+    <script src="../assets/js/api.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const user = await APIService.requireRole(['student']);
+            if (!user) return;
+            document.getElementById('userName').textContent = user.name;
+            document.getElementById('userAvatar').textContent = user.name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+
+            try {
+                const records = await APIService.getMyAttendance();
+                const present = records.filter(r => r.status === 'present').length;
+                const absent = records.length - present;
+                document.getElementById('overallPct').textContent = records.length ? Math.round((present / records.length) * 100) + '%' : '0%';
+                document.getElementById('presentCount').textContent = present;
+                document.getElementById('absentCount').textContent = absent;
+
+                const bySubject = {};
+                records.forEach(r => {
+                    const name = r.subjects?.name || 'Unknown';
+                    bySubject[name] = bySubject[name] || { present: 0, total: 0 };
+                    bySubject[name].total++;
+                    if (r.status === 'present') bySubject[name].present++;
+                });
+                const labels = Object.keys(bySubject);
+                const data = labels.map(l => Math.round((bySubject[l].present / bySubject[l].total) * 100));
+                new Chart(document.getElementById('subjectChart').getContext('2d'), {
+                    type: 'bar',
+                    data: { labels, datasets: [{ label: 'Attendance %', data, backgroundColor: '#2563EB', borderRadius: 8 }] },
+                    options: { responsive: true, plugins: { legend: { display: false } },
+                        scales: { y: { beginAtZero: true, max: 100, ticks: { color: '#94A3B8' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                                  x: { ticks: { color: '#94A3B8' }, grid: { display: false } } } }
+                });
+
+                const tbody = document.getElementById('recordsBody');
+                tbody.innerHTML = records.length ? records.slice(0, 30).map(r => `
+                    <tr>
+                        <td>${new Date(r.date).toLocaleDateString()}</td>
+                        <td>${r.subjects?.name || '-'}</td>
+                        <td><span class="badge ${r.status === 'present' ? 'badge-success' : 'badge-danger'}">${r.status}</span></td>
+                    </tr>`).join('') : '<tr><td colspan="3" class="text-muted small">No attendance records yet.</td></tr>';
+            } catch (e) { console.error(e); }
+        });
+    </script>
+</body>
+</html>

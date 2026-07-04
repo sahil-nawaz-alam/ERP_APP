@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leave Approval - Smart College ERP</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+    <div class="dashboard-layout">
+        <aside class="sidebar">
+            <div class="sidebar-header"><div class="sidebar-logo">SC</div><div class="sidebar-title">ERP System</div></div>
+            <ul class="sidebar-menu">
+                <li><a href="dashboard.html"><i class="bi bi-speedometer2"></i><span>Dashboard</span></a></li>
+                <li><a href="attendance.html"><i class="bi bi-calendar-check"></i><span>Attendance</span></a></li>
+                <li><a href="assignments.html"><i class="bi bi-file-earmark-text"></i><span>Assignments</span></a></li>
+                <li><a href="submissions.html"><i class="bi bi-inbox"></i><span>Submissions</span></a></li>
+                <li><a href="leave-approval.html" class="active"><i class="bi bi-calendar-x"></i><span>Leave Approval</span></a></li>
+                <li style="margin-top: 40px; border-top: 1px solid var(--glass-border); padding-top: 20px;">
+                    <a href="#" onclick="APIService.logout()"><i class="bi bi-box-arrow-right"></i><span>Logout</span></a>
+                </li>
+            </ul>
+        </aside>
+        <div class="main-content">
+            <nav class="navbar">
+                <div class="navbar-search"><i class="bi bi-search"></i><input type="text" placeholder="Search by student name..."></div>
+                <div class="navbar-right">
+                    <div class="navbar-icon notification"><i class="bi bi-bell"></i><span class="notification-badge" id="notifCount">0</span></div>
+                    <div class="navbar-icon"><i class="bi bi-gear"></i></div>
+                    <div class="user-profile">
+                        <div class="user-avatar" id="userAvatar">--</div>
+                        <div class="user-info"><strong>Teacher</strong><small id="userName">Loading...</small></div>
+                        <i class="bi bi-chevron-down"></i>
+                    </div>
+                </div>
+            </nav>
+            <div class="content">
+                <div class="mb-4"><h1 class="h2 mb-2">Leave Approval</h1><p class="text-muted">Review and approve/reject student leave requests</p></div>
+
+                <div class="table-card mb-4">
+                    <div class="chart-header mb-4"><h5 class="chart-title">Pending Leave Requests</h5><span class="text-muted small" id="pendingCount">0 Pending</span></div>
+                    <div id="pendingList" style="display:flex; flex-direction:column; gap:12px;"><p class="text-muted small">Loading...</p></div>
+                </div>
+
+                <div class="table-card">
+                    <div class="chart-header mb-4"><h5 class="chart-title">Recent History</h5></div>
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead><tr><th>Student</th><th>Dates</th><th>Days</th><th>Status</th></tr></thead>
+                            <tbody id="historyBody"><tr><td colspan="4" class="text-muted small">Loading...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../assets/js/supabase-config.js"></script>
+    <script src="../assets/js/api.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const user = await APIService.requireRole(['teacher', 'admin']);
+            if (!user) return;
+            document.getElementById('userName').textContent = user.name;
+            document.getElementById('userAvatar').textContent = user.name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+            await refresh();
+        });
+
+        async function refresh() {
+            const pending = await APIService.getPendingLeaves();
+            document.getElementById('pendingCount').textContent = `${pending.length} Pending`;
+            document.getElementById('notifCount').textContent = pending.length;
+
+            const el = document.getElementById('pendingList');
+            el.innerHTML = pending.length ? pending.map(l => `
+                <div style="background: rgba(37,99,235,0.1); border-left: 4px solid #2563EB; padding: 16px; border-radius: 8px;">
+                    <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:12px;">
+                        <div>
+                            <h6 style="margin-bottom:4px;">${l.students?.users?.name || ''}</h6>
+                            <p style="font-size:12px; color:var(--text-secondary); margin:0;">Roll: ${l.students?.roll_no || ''} | Email: ${l.students?.users?.email || ''}</p>
+                        </div>
+                        <span class="badge badge-warning">Pending</span>
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:12px;">
+                        <div><span style="font-size:11px; color:var(--text-muted); text-transform:uppercase;">Start</span><div style="font-weight:600; font-size:14px;">${new Date(l.start_date).toLocaleDateString()}</div></div>
+                        <div><span style="font-size:11px; color:var(--text-muted); text-transform:uppercase;">End</span><div style="font-weight:600; font-size:14px;">${new Date(l.end_date).toLocaleDateString()}</div></div>
+                        <div><span style="font-size:11px; color:var(--text-muted); text-transform:uppercase;">Days</span><div style="font-weight:600; font-size:14px;">${l.days} Days</div></div>
+                    </div>
+                    <p style="font-size:13px; color:var(--text-secondary); margin-bottom:12px; padding:12px; background:rgba(255,255,255,0.05); border-radius:6px;"><strong>Reason:</strong> ${l.reason}</p>
+                    <div style="display:flex; gap:8px;">
+                        <button class="btn btn-sm btn-success" onclick="approve(${l.id})"><i class="bi bi-check-circle me-1"></i>Approve</button>
+                        <button class="btn btn-sm btn-danger" onclick="reject(${l.id})"><i class="bi bi-x-circle me-1"></i>Reject</button>
+                    </div>
+                </div>`).join('') : '<p class="text-muted small">No pending leave requests.</p>';
+
+            const all = await APIService.getAllLeaves();
+            const badges = { approved: 'badge-success', pending: 'badge-warning', rejected: 'badge-danger' };
+            document.getElementById('historyBody').innerHTML = all.length ? all.slice(0, 20).map(l => `
+                <tr>
+                    <td>${l.students?.users?.name || ''}</td>
+                    <td>${new Date(l.start_date).toLocaleDateString()} - ${new Date(l.end_date).toLocaleDateString()}</td>
+                    <td>${l.days}</td>
+                    <td><span class="badge ${badges[l.status]}">${l.status}</span></td>
+                </tr>`).join('') : '<tr><td colspan="4" class="text-muted small">No records.</td></tr>';
+        }
+
+        async function approve(id) {
+            try { await APIService.approveLeave(id); await refresh(); } catch (e) { alert(e.message); }
+        }
+        async function reject(id) {
+            const reason = prompt('Reason for rejection:', 'Exceeds leave balance');
+            if (reason === null) return;
+            try { await APIService.rejectLeave(id, reason); await refresh(); } catch (e) { alert(e.message); }
+        }
+    </script>
+</body>
+</html>

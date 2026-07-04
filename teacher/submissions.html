@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Review Submissions - Smart College ERP</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+    <div class="dashboard-layout">
+        <aside class="sidebar">
+            <div class="sidebar-header"><div class="sidebar-logo">SC</div><div class="sidebar-title">ERP System</div></div>
+            <ul class="sidebar-menu">
+                <li><a href="dashboard.html"><i class="bi bi-speedometer2"></i><span>Dashboard</span></a></li>
+                <li><a href="attendance.html"><i class="bi bi-calendar-check"></i><span>Attendance</span></a></li>
+                <li><a href="assignments.html"><i class="bi bi-file-earmark-text"></i><span>Assignments</span></a></li>
+                <li><a href="submissions.html" class="active"><i class="bi bi-inbox"></i><span>Submissions</span></a></li>
+                <li><a href="leave-approval.html"><i class="bi bi-calendar-x"></i><span>Leave Approval</span></a></li>
+                <li style="margin-top: 40px; border-top: 1px solid var(--glass-border); padding-top: 20px;">
+                    <a href="#" onclick="APIService.logout()"><i class="bi bi-box-arrow-right"></i><span>Logout</span></a>
+                </li>
+            </ul>
+        </aside>
+        <div class="main-content">
+            <nav class="navbar">
+                <div class="navbar-search"><i class="bi bi-search"></i><input type="text" placeholder="Search submissions..."></div>
+                <div class="navbar-right">
+                    <div class="navbar-icon notification"><i class="bi bi-bell"></i><span class="notification-badge">0</span></div>
+                    <div class="navbar-icon"><i class="bi bi-gear"></i></div>
+                    <div class="user-profile">
+                        <div class="user-avatar" id="userAvatar">--</div>
+                        <div class="user-info"><strong>Teacher</strong><small id="userName">Loading...</small></div>
+                        <i class="bi bi-chevron-down"></i>
+                    </div>
+                </div>
+            </nav>
+            <div class="content">
+                <div class="mb-4"><h1 class="h2 mb-2">Review Submissions</h1><p class="text-muted">Review and grade student submissions</p></div>
+
+                <div class="table-card">
+                    <div class="chart-header mb-3"><h5 class="chart-title">Submissions</h5><span class="text-muted small" id="countLabel"></span></div>
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead><tr><th>Roll No</th><th>Student</th><th>Assignment</th><th>Submitted</th><th>Status</th><th>Marks</th><th>Grade</th><th>Actions</th></tr></thead>
+                            <tbody id="subsBody"><tr><td colspan="8" class="text-muted small">Loading...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="gradeModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content" style="background: var(--bg-dark-2); border: 1px solid var(--glass-border); border-radius: 16px;">
+                <div class="modal-header border-bottom"><h5 class="modal-title">Grade Submission</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <input type="hidden" id="gradeSubId">
+                    <div class="mb-3"><label class="form-label">Marks (out of 100)</label><input type="number" min="0" max="100" class="form-control glass-input" id="gradeMarks"></div>
+                    <div class="mb-3"><label class="form-label">Grade</label>
+                        <select class="form-control glass-input" id="gradeLetter">
+                            <option value="A">A (90-100)</option><option value="B">B (80-89)</option>
+                            <option value="C">C (70-79)</option><option value="D">D (60-69)</option><option value="F">F (Below 60)</option>
+                        </select>
+                    </div>
+                    <div class="mb-3"><label class="form-label">Feedback</label><textarea class="form-control glass-input" id="gradeFeedback" rows="3"></textarea></div>
+                </div>
+                <div class="modal-footer border-top">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="doGrade()">Save Grade</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../assets/js/supabase-config.js"></script>
+    <script src="../assets/js/api.js"></script>
+    <script>
+        let gradeModal;
+        document.addEventListener('DOMContentLoaded', async () => {
+            const user = await APIService.requireRole(['teacher']);
+            if (!user) return;
+            document.getElementById('userName').textContent = user.name;
+            document.getElementById('userAvatar').textContent = user.name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+            gradeModal = new bootstrap.Modal(document.getElementById('gradeModal'));
+
+            const params = new URLSearchParams(location.search);
+            await loadSubmissions(params.get('assignment'));
+        });
+
+        async function loadSubmissions(assignmentId) {
+            const subs = await APIService.getSubmissionsForReview(assignmentId ? { assignmentId } : {});
+            document.getElementById('countLabel').textContent = `${subs.length} submission(s)`;
+            const body = document.getElementById('subsBody');
+            if (!subs.length) { body.innerHTML = '<tr><td colspan="8" class="text-muted small">No submissions yet.</td></tr>'; return; }
+            body.innerHTML = subs.map(s => `
+                <tr>
+                    <td><strong>${s.students?.roll_no || ''}</strong></td>
+                    <td>${s.students?.users?.name || ''}</td>
+                    <td>${s.assignments?.title || ''}</td>
+                    <td>${new Date(s.submitted_at).toLocaleString()}</td>
+                    <td><span class="badge ${s.status === 'reviewed' ? 'badge-success' : 'badge-info'}">${s.status}</span></td>
+                    <td>${s.marks ?? '-'}</td>
+                    <td>${s.grade ?? '-'}</td>
+                    <td>
+                        ${s.file_url ? `<a class="btn btn-sm btn-outline-secondary" href="${s.file_url}" target="_blank"><i class="bi bi-file-earmark"></i></a>` : ''}
+                        <button class="btn btn-sm btn-outline-primary" onclick="openGrade(${s.id}, ${s.marks || 0}, '${s.grade || 'A'}', ${JSON.stringify(s.feedback || '')})">Grade</button>
+                    </td>
+                </tr>`).join('');
+        }
+
+        function openGrade(id, marks, grade, feedback) {
+            document.getElementById('gradeSubId').value = id;
+            document.getElementById('gradeMarks').value = marks;
+            document.getElementById('gradeLetter').value = grade;
+            document.getElementById('gradeFeedback').value = feedback;
+            gradeModal.show();
+        }
+
+        async function doGrade() {
+            const id = document.getElementById('gradeSubId').value;
+            const marks = Number(document.getElementById('gradeMarks').value);
+            const grade = document.getElementById('gradeLetter').value;
+            const feedback = document.getElementById('gradeFeedback').value;
+            try {
+                await APIService.gradeSubmission(id, marks, grade, feedback);
+                gradeModal.hide();
+                await loadSubmissions(new URLSearchParams(location.search).get('assignment'));
+            } catch (e) { alert(e.message); }
+        }
+    </script>
+</body>
+</html>

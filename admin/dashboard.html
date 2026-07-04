@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Smart College ERP</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <style>
+        .nav-tabs { border-bottom: 1px solid var(--glass-border); margin-bottom: 20px; }
+        .nav-tabs .nav-link { color: var(--text-secondary); border: none; border-bottom: 2px solid transparent; }
+        .nav-tabs .nav-link.active { color: #fff; background: transparent; border-bottom: 2px solid var(--primary); }
+    </style>
+</head>
+<body>
+    <div class="dashboard-layout">
+        <aside class="sidebar">
+            <div class="sidebar-header"><div class="sidebar-logo">SC</div><div class="sidebar-title">ERP System</div></div>
+            <ul class="sidebar-menu">
+                <li><a href="#" class="active" onclick="showTab('overview')"><i class="bi bi-speedometer2"></i><span>Overview</span></a></li>
+                <li><a href="#" onclick="showTab('students')"><i class="bi bi-people"></i><span>Students</span></a></li>
+                <li><a href="#" onclick="showTab('teachers')"><i class="bi bi-person-workspace"></i><span>Teachers</span></a></li>
+                <li><a href="#" onclick="showTab('subjects')"><i class="bi bi-journal-text"></i><span>Subjects</span></a></li>
+                <li><a href="#" onclick="showTab('leaves')"><i class="bi bi-calendar-x"></i><span>Leave Requests</span></a></li>
+                <li style="margin-top: 40px; border-top: 1px solid var(--glass-border); padding-top: 20px;">
+                    <a href="#" onclick="APIService.logout()"><i class="bi bi-box-arrow-right"></i><span>Logout</span></a>
+                </li>
+            </ul>
+        </aside>
+        <div class="main-content">
+            <nav class="navbar">
+                <div class="navbar-search"><i class="bi bi-search"></i><input type="text" placeholder="Search..."></div>
+                <div class="navbar-right">
+                    <div class="navbar-icon notification"><i class="bi bi-bell"></i><span class="notification-badge" id="notifCount">0</span></div>
+                    <div class="navbar-icon"><i class="bi bi-gear"></i></div>
+                    <div class="user-profile">
+                        <div class="user-avatar" id="userAvatar">--</div>
+                        <div class="user-info"><strong>Admin</strong><small id="userName">Loading...</small></div>
+                        <i class="bi bi-chevron-down"></i>
+                    </div>
+                </div>
+            </nav>
+            <div class="content">
+
+                <!-- OVERVIEW -->
+                <div id="tab-overview">
+                    <div class="mb-4"><h1 class="h2 mb-2">Admin Overview</h1><p class="text-muted">Institution-wide snapshot</p></div>
+                    <div class="row g-4 mb-4">
+                        <div class="col-lg-3"><div class="stat-card"><div class="stat-icon primary"><i class="bi bi-people"></i></div><div class="stat-label">Students</div><div class="stat-value" id="statStudents">--</div></div></div>
+                        <div class="col-lg-3"><div class="stat-card"><div class="stat-icon success"><i class="bi bi-person-workspace"></i></div><div class="stat-label">Teachers</div><div class="stat-value" id="statTeachers">--</div></div></div>
+                        <div class="col-lg-3"><div class="stat-card"><div class="stat-icon warning"><i class="bi bi-journal-text"></i></div><div class="stat-label">Subjects</div><div class="stat-value" id="statSubjects">--</div></div></div>
+                        <div class="col-lg-3"><div class="stat-card"><div class="stat-icon danger"><i class="bi bi-calendar-x"></i></div><div class="stat-label">Pending Leaves</div><div class="stat-value" id="statLeaves">--</div></div></div>
+                    </div>
+                    <div class="table-card">
+                        <div class="chart-header mb-3"><h5 class="chart-title">Total Assignments Created</h5></div>
+                        <div class="stat-value" id="statAssignments">--</div>
+                    </div>
+                </div>
+
+                <!-- STUDENTS -->
+                <div id="tab-students" style="display:none;">
+                    <div class="mb-4"><h1 class="h2 mb-2">Students</h1><p class="text-muted">All enrolled students</p></div>
+                    <div class="table-card">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead><tr><th>Roll No</th><th>Name</th><th>Email</th><th>Program</th><th>Batch</th><th>Sem</th><th>CGPA</th><th>Status</th></tr></thead>
+                                <tbody id="studentsBody"><tr><td colspan="8" class="text-muted small">Loading...</td></tr></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TEACHERS -->
+                <div id="tab-teachers" style="display:none;">
+                    <div class="mb-4"><h1 class="h2 mb-2">Teachers</h1><p class="text-muted">Faculty directory</p></div>
+                    <div class="table-card">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead><tr><th>Employee ID</th><th>Name</th><th>Email</th><th>Department</th><th>Designation</th></tr></thead>
+                                <tbody id="teachersBody"><tr><td colspan="5" class="text-muted small">Loading...</td></tr></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SUBJECTS -->
+                <div id="tab-subjects" style="display:none;">
+                    <div class="mb-4 d-flex justify-content-between align-items-center">
+                        <div><h1 class="h2 mb-2">Subjects</h1><p class="text-muted">Curriculum management</p></div>
+                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#subjectModal"><i class="bi bi-plus-circle me-2"></i>Add Subject</button>
+                    </div>
+                    <div class="table-card">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead><tr><th>Code</th><th>Name</th><th>Semester</th><th>Credits</th></tr></thead>
+                                <tbody id="subjectsBody"><tr><td colspan="4" class="text-muted small">Loading...</td></tr></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LEAVES -->
+                <div id="tab-leaves" style="display:none;">
+                    <div class="mb-4"><h1 class="h2 mb-2">Leave Requests</h1><p class="text-muted">All student leave requests across the institution</p></div>
+                    <div class="table-card">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead><tr><th>Student</th><th>Dates</th><th>Days</th><th>Reason</th><th>Status</th><th>Actions</th></tr></thead>
+                                <tbody id="leavesBody"><tr><td colspan="6" class="text-muted small">Loading...</td></tr></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="subjectModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content" style="background: var(--bg-dark-2); border: 1px solid var(--glass-border); border-radius: 16px;">
+                <div class="modal-header border-bottom"><h5 class="modal-title">Add Subject</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <div class="mb-3"><label class="form-label">Program</label><select class="form-control glass-input" id="subjProgram"></select></div>
+                    <div class="mb-3"><label class="form-label">Code</label><input type="text" class="form-control glass-input" id="subjCode" placeholder="e.g. CS401"></div>
+                    <div class="mb-3"><label class="form-label">Name</label><input type="text" class="form-control glass-input" id="subjName"></div>
+                    <div class="mb-3"><label class="form-label">Semester</label><input type="number" min="1" max="8" class="form-control glass-input" id="subjSemester"></div>
+                    <div class="mb-3"><label class="form-label">Credits</label><input type="number" min="1" max="6" class="form-control glass-input" id="subjCredits" value="3"></div>
+                </div>
+                <div class="modal-footer border-top">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="addSubject()">Add</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../assets/js/supabase-config.js"></script>
+    <script src="../assets/js/api.js"></script>
+    <script>
+        let subjectModal;
+        document.addEventListener('DOMContentLoaded', async () => {
+            const user = await APIService.requireRole(['admin']);
+            if (!user) return;
+            document.getElementById('userName').textContent = user.name;
+            document.getElementById('userAvatar').textContent = user.name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+            subjectModal = new bootstrap.Modal(document.getElementById('subjectModal'));
+
+            await loadOverview();
+        });
+
+        function showTab(name) {
+            ['overview','students','teachers','subjects','leaves'].forEach(t => {
+                document.getElementById('tab-' + t).style.display = t === name ? 'block' : 'none';
+            });
+            document.querySelectorAll('.sidebar-menu a').forEach(a => a.classList.remove('active'));
+            event.target.closest('a').classList.add('active');
+
+            if (name === 'students') loadStudents();
+            if (name === 'teachers') loadTeachers();
+            if (name === 'subjects') loadSubjects();
+            if (name === 'leaves') loadLeaves();
+        }
+
+        async function loadOverview() {
+            const stats = await APIService.getAdminStats();
+            document.getElementById('statStudents').textContent = stats.students ?? 0;
+            document.getElementById('statTeachers').textContent = stats.teachers ?? 0;
+            document.getElementById('statSubjects').textContent = stats.subjects ?? 0;
+            document.getElementById('statLeaves').textContent = stats.pendingLeaves ?? 0;
+            document.getElementById('statAssignments').textContent = stats.assignments ?? 0;
+            document.getElementById('notifCount').textContent = stats.pendingLeaves ?? 0;
+        }
+
+        async function loadStudents() {
+            const students = await APIService.getAllStudents();
+            document.getElementById('studentsBody').innerHTML = students.length ? students.map(s => `
+                <tr>
+                    <td><strong>${s.roll_no}</strong></td>
+                    <td>${s.users?.name || ''}</td>
+                    <td>${s.users?.email || ''}</td>
+                    <td>${s.programs?.name || ''}</td>
+                    <td>${s.batches?.name || ''}</td>
+                    <td>${s.current_semester}</td>
+                    <td>${s.cgpa}</td>
+                    <td><span class="badge ${s.status === 'active' ? 'badge-success' : 'badge-danger'}">${s.status}</span></td>
+                </tr>`).join('') : '<tr><td colspan="8" class="text-muted small">No students yet.</td></tr>';
+        }
+
+        async function loadTeachers() {
+            const teachers = await APIService.getAllTeachers();
+            document.getElementById('teachersBody').innerHTML = teachers.length ? teachers.map(t => `
+                <tr>
+                    <td><strong>${t.employee_id || ''}</strong></td>
+                    <td>${t.users?.name || ''}</td>
+                    <td>${t.users?.email || ''}</td>
+                    <td>${t.department || ''}</td>
+                    <td>${t.designation || ''}</td>
+                </tr>`).join('') : '<tr><td colspan="5" class="text-muted small">No teachers yet.</td></tr>';
+        }
+
+        let programsCache = [];
+        async function loadSubjects() {
+            const { data: subjects } = await supabaseClient.from('subjects').select('*').order('semester');
+            document.getElementById('subjectsBody').innerHTML = subjects?.length ? subjects.map(s => `
+                <tr><td>${s.code || ''}</td><td>${s.name}</td><td>${s.semester}</td><td>${s.credits}</td></tr>`).join('')
+                : '<tr><td colspan="4" class="text-muted small">No subjects yet.</td></tr>';
+
+            const { data: programs } = await supabaseClient.from('programs').select('*');
+            programsCache = programs || [];
+            document.getElementById('subjProgram').innerHTML = programsCache.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+        }
+
+        async function addSubject() {
+            const programId = Number(document.getElementById('subjProgram').value);
+            const code = document.getElementById('subjCode').value;
+            const name = document.getElementById('subjName').value;
+            const semester = Number(document.getElementById('subjSemester').value);
+            const credits = Number(document.getElementById('subjCredits').value) || 3;
+            if (!name || !semester) return alert('Name and semester are required');
+            try {
+                await APIService.createSubject(programId, code, name, semester, credits);
+                subjectModal.hide();
+                await loadSubjects();
+                await loadOverview();
+            } catch (e) { alert(e.message); }
+        }
+
+        async function loadLeaves() {
+            const leaves = await APIService.getAllLeaves();
+            const badges = { approved: 'badge-success', pending: 'badge-warning', rejected: 'badge-danger' };
+            document.getElementById('leavesBody').innerHTML = leaves.length ? leaves.map(l => `
+                <tr>
+                    <td>${l.students?.users?.name || ''}</td>
+                    <td>${new Date(l.start_date).toLocaleDateString()} - ${new Date(l.end_date).toLocaleDateString()}</td>
+                    <td>${l.days}</td>
+                    <td style="max-width:220px;">${l.reason}</td>
+                    <td><span class="badge ${badges[l.status]}">${l.status}</span></td>
+                    <td>
+                        ${l.status === 'pending' ? `
+                            <button class="btn btn-sm btn-success" onclick="adminApprove(${l.id})"><i class="bi bi-check"></i></button>
+                            <button class="btn btn-sm btn-danger" onclick="adminReject(${l.id})"><i class="bi bi-x"></i></button>` : '-'}
+                    </td>
+                </tr>`).join('') : '<tr><td colspan="6" class="text-muted small">No leave requests yet.</td></tr>';
+        }
+
+        async function adminApprove(id) { try { await APIService.approveLeave(id); await loadLeaves(); await loadOverview(); } catch (e) { alert(e.message); } }
+        async function adminReject(id) {
+            const reason = prompt('Reason for rejection:', 'Exceeds leave balance');
+            if (reason === null) return;
+            try { await APIService.rejectLeave(id, reason); await loadLeaves(); await loadOverview(); } catch (e) { alert(e.message); }
+        }
+    </script>
+</body>
+</html>
