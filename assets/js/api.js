@@ -12,19 +12,29 @@ const APIService = {
   // AUTH
   // ---------------------------------------------------------
   async login(email, password) {
-    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-    if (error) throw new Error(error.message);
 
-    const profile = await this._loadProfile(data.user.id);
-    localStorage.setItem('userEmail', profile.email);
-    localStorage.setItem('userRole', profile.role);
-    localStorage.setItem('userId', profile.id);
-    localStorage.setItem('userName', profile.name);
-    localStorage.setItem('isLoggedIn', 'true');
+  const { data: user, error } = await supabaseClient
+    .from("users")
+    .select("*")
+    .eq("email", email)
+    .eq("password", password)
+    .single();
 
-    return { success: true, user: profile };
-  },
+  if (error || !user) {
+    throw new Error("Invalid email or password");
+  }
 
+  localStorage.setItem("userEmail", user.email);
+  localStorage.setItem("userRole", user.role);
+  localStorage.setItem("userId", user.id);
+  localStorage.setItem("userName", user.name);
+  localStorage.setItem("isLoggedIn", "true");
+
+  return {
+    success: true,
+    user
+  };
+}
   async signup(email, password, name, role) {
     const { data, error } = await supabaseClient.auth.signUp({
       email, password,
