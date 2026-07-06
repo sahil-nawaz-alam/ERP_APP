@@ -69,22 +69,22 @@ const APIService = {
   },
 
   async _loadProfile(userId) {
-    const { data, error } = await supabaseClient
-      .from("users")
-      .select("*")
-      .eq("id", userId)
-      .maybeSingle();
+  const { data, error } = await supabaseClient
+    .from("users")
+    .select("*")
+    .eq("id", userId)
+    .maybeSingle();
 
-    if (error) {
-      throw new Error(error.message);
-    }
+  if (error) {
+    throw new Error(error.message);
+  }
 
-    if (!data) {
-      throw new Error("User profile not found.");
-    }
+  if (!data) {
+    throw new Error("User profile not found.");
+  }
 
-    return data;
-  },
+  return data;
+},
 
   // Redirect to login if not authenticated, or if role doesn't match.
   // Usage: await APIService.requireRole(['student']);
