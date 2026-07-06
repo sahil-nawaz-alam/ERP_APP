@@ -35,7 +35,8 @@ const APIService = {
 
   return {
     success: true,
-    user: profile
+    user
+    
   };
 },
   
