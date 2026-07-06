@@ -4,15 +4,6 @@
 //    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 //    <script src="../assets/js/supabase-config.js"></script>
 //    <script src="../assets/js/api.js"></script>
-//
-//  NOTE: This app has no public signup page. Accounts are created
-//  by an admin (see createUserAccount below), which creates the
-//  Supabase Auth user AND the matching profile rows (users / students
-//  / teachers) in one step, so logins never hit a "missing profile"
-//  error. If you ever add users directly from the Supabase Auth
-//  dashboard instead of through createUserAccount, you must also
-//  manually insert matching rows into public.users (+ students or
-//  teachers), or set up a DB trigger on auth.users to do it for you.
 // ============================================================
 
 const APIService = {
@@ -20,39 +11,27 @@ const APIService = {
   // ---------------------------------------------------------
   // AUTH
   // ---------------------------------------------------------
-
   async login(email, password) {
-    // Sign in to Supabase Auth
-    const { data, error } = await supabaseClient.auth.signInWithPassword({
-      email,
-      password
+    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+    if (error) throw new Error(error.message);
+
+    const profile = await this._loadProfile(data.user.id);
+    localStorage.setItem('userEmail', profile.email);
+    localStorage.setItem('userRole', profile.role);
+    localStorage.setItem('userId', profile.id);
+    localStorage.setItem('userName', profile.name);
+    localStorage.setItem('isLoggedIn', 'true');
+
+    return { success: true, user: profile };
+  },
+
+  async signup(email, password, name, role) {
+    const { data, error } = await supabaseClient.auth.signUp({
+      email, password,
+      options: { data: { name, role } }
     });
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    // Load the user's profile
-    let profile;
-    try {
-      profile = await this._loadProfile(data.user.id);
-    } catch (err) {
-      throw new Error(
-        "Login succeeded, but no matching user profile was found. Please contact the administrator."
-      );
-    }
-
-    // Save user data
-    localStorage.setItem("userId", profile.id);
-    localStorage.setItem("userName", profile.name || "");
-    localStorage.setItem("userEmail", profile.email || "");
-    localStorage.setItem("userRole", profile.role || "");
-    localStorage.setItem("isLoggedIn", "true");
-
-    return {
-      success: true,
-      user: profile
-    };
+    if (error) throw new Error(error.message);
+    return data;
   },
 
   async logout() {
@@ -69,22 +48,11 @@ const APIService = {
   },
 
   async _loadProfile(userId) {
-  const { data, error } = await supabaseClient
-    .from("users")
-    .select("*")
-    .eq("id", userId)
-    .maybeSingle();
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  if (!data) {
-    throw new Error("User profile not found.");
-  }
-
-  return data;
-},
+    const { data, error } = await supabaseClient
+      .from('users').select('*').eq('id', userId).single();
+    if (error) throw new Error(error.message);
+    return data;
+  },
 
   // Redirect to login if not authenticated, or if role doesn't match.
   // Usage: await APIService.requireRole(['student']);
@@ -102,30 +70,17 @@ const APIService = {
     }
   },
 
-  // NOTE: switched from .single() to .maybeSingle() so a missing row
-  // produces a clear, catchable error instead of PostgREST's
-  // "Cannot coerce the result to a single JSON object" (PGRST116).
   async _studentRow(userId) {
     const { data, error } = await supabaseClient
-      .from('students').select('*').eq('user_id', userId).maybeSingle();
+      .from('students').select('*').eq('user_id', userId).single();
     if (error) throw new Error(error.message);
-    if (!data) {
-      throw new Error(
-        "No student record found for this account. Ask the administrator to link this user to a student profile."
-      );
-    }
     return data;
   },
 
   async _teacherRow(userId) {
     const { data, error } = await supabaseClient
-      .from('teachers').select('*').eq('user_id', userId).maybeSingle();
+      .from('teachers').select('*').eq('user_id', userId).single();
     if (error) throw new Error(error.message);
-    if (!data) {
-      throw new Error(
-        "No teacher record found for this account. Ask the administrator to link this user to a teacher profile."
-      );
-    }
     return data;
   },
 
@@ -421,33 +376,5 @@ const APIService = {
     const { error } = await supabaseClient.from('users').update({ is_active: false }).eq('id', userId);
     if (error) throw new Error(error.message);
     return { success: true };
-  },
-
-  // ---------------------------------------------------------
-  // ADMIN — CREATE ACCOUNTS (replaces the old public signup())
-  //
-  // Since this app has no public signup page, admins create every
-  // account (student, teacher, or another admin) from the admin
-  // panel. This single call creates the Supabase Auth user AND the
-  // matching profile rows, so logins never fail with a missing
-  // profile / "Cannot coerce the result to a single JSON object" error.
-  //
-  // IMPORTANT: supabaseClient.auth.signUp() will sign the admin OUT
-  // and sign the NEW user IN on the client, because Supabase's JS
-  // client always attaches the newest session. For an admin panel,
-  // do this server-side instead (e.g. a Supabase Edge Function using
-  // the service_role key with supabase.auth.admin.createUser()),
-  // which does NOT affect the calling admin's session. The function
-  // below is written to call such an Edge Function named
-  // "admin-create-user". Adjust the function name / payload to match
-  // whatever you deploy.
-  // ---------------------------------------------------------
-  async createUserAccount({ email, password, name, role, extra = {} }) {
-    const { data, error } = await supabaseClient.functions.invoke('admin-create-user', {
-      body: { email, password, name, role, extra }
-    });
-    if (error) throw new Error(error.message);
-    if (data?.error) throw new Error(data.error);
-    return data; // expected: { success: true, userId, user: {...} }
   }
 };
