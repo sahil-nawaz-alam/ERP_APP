@@ -12,8 +12,8 @@ const APIService = {
   // AUTH
   // ---------------------------------------------------------
 
-  async login(email, password) {
-  // Sign in with Supabase
+ async login(email, password) {
+  // Sign in to Supabase Auth
   const { data, error } = await supabaseClient.auth.signInWithPassword({
     email,
     password
@@ -23,20 +23,26 @@ const APIService = {
     throw new Error(error.message);
   }
 
-  // Load user profile from the 'users' table
-  const profile = await this._loadProfile(data.user.id);
+  // Load the user's profile
+  let profile;
+  try {
+    profile = await this._loadProfile(data.user.id);
+  } catch (err) {
+    throw new Error(
+      "Login succeeded, but no matching user profile was found. Please contact the administrator."
+    );
+  }
 
-  // Store user information
+  // Save user data
+  localStorage.setItem("userId", profile.id);
+  localStorage.setItem("userName", profile.name || "");
   localStorage.setItem("userEmail", profile.email || "");
   localStorage.setItem("userRole", profile.role || "");
-  localStorage.setItem("userId", profile.id || "");
-  localStorage.setItem("userName", profile.name || "");
   localStorage.setItem("isLoggedIn", "true");
 
   return {
     success: true,
-    user
-    
+    user: profile
   };
 },
   
@@ -63,11 +69,22 @@ const APIService = {
   },
 
   async _loadProfile(userId) {
-    const { data, error } = await supabaseClient
-      .from('users').select('*').eq('id', userId).single();
-    if (error) throw new Error(error.message);
-    return data;
-  },
+  const { data, error } = await supabaseClient
+    .from("users")
+    .select("*")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!data) {
+    throw new Error("User profile not found.");
+  }
+
+  return data;
+},
 
   // Redirect to login if not authenticated, or if role doesn't match.
   // Usage: await APIService.requireRole(['student']);
