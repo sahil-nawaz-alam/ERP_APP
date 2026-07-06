@@ -12,18 +12,11 @@ const APIService = {
   // AUTH
   // ---------------------------------------------------------
   async login(email, password) {
+  const {data , error} = await superbaseClient.auth.signInWitPassword({email , password});
+    if (error) throw new Error(roor.message);
 
-  const { data: user, error } = await supabaseClient
-    .from("users")
-    .select("*")
-    .eq("email", email)
-    .eq("password", password)
-    .single();
-
-  if (error || !user) {
-    throw new Error("Invalid email or password");
-  }
-
+  
+  const user = await this._loadProfile(data.user.id);
   localStorage.setItem("userEmail", user.email);
   localStorage.setItem("userRole", user.role);
   localStorage.setItem("userId", user.id);
@@ -32,7 +25,7 @@ const APIService = {
 
   return {
     success: true,
-    user
+    user : profile
   };
 }
   async signup(email, password, name, role) {
